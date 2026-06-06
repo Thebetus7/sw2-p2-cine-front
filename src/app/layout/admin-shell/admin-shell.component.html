@@ -1,0 +1,46 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">CC</span>
+      <div>
+        <strong>Cinema Core</strong>
+        <small>Administracion</small>
+      </div>
+    </div>
+
+    <nav>
+      @for (item of navItems; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="active">
+          <span>{{ item.icon }}</span>
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+  </aside>
+
+  <main class="workspace">
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">GraphQL</span>
+        <strong>{{ graphqlUrl }}</strong>
+      </div>
+
+      <form class="token-form" (ngSubmit)="saveToken()">
+        <input
+          name="token"
+          type="password"
+          autocomplete="off"
+          [(ngModel)]="tokenDraft"
+          placeholder="JWT externo"
+          aria-label="JWT externo"
+        />
+        <button type="submit">Guardar token</button>
+        <button type="button" class="ghost" (click)="clearToken()">Limpiar</button>
+      </form>
+    </header>
+
+    <section class="content">
+      <router-outlet />
+    </section>
+  </main>
+</div>
