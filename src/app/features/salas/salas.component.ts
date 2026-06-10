@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ESTADOS_SALA, EstadoSala, Sala, Sucursal, TIPOS_SALA, TipoSala } from '../../core/models/cinema.models';
+import { Sala, Sucursal } from '../../core/models/cinema.models';
 import { CinemaCoreService } from '../../core/services/cinema-core.service';
+import { SalaFormValue, SalasModalComponent } from './salas-modal.component';
+import { SalasTableComponent } from './salas-table.component';
 
 @Component({
   selector: 'app-salas',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, SalasTableComponent, SalasModalComponent],
   template: `
     <div class="page">
       <header class="page-header">
@@ -22,109 +23,40 @@ import { CinemaCoreService } from '../../core/services/cinema-core.service';
         <div class="alert">{{ error }}</div>
       }
 
-      <section class="panel">
-        <div class="page-header">
-          <div>
-            <h2>Listado</h2>
-            <p>Filtra por sucursal para revisar capacidad y estado.</p>
-          </div>
-          <select [value]="filterSucursal" (change)="filter(($any($event.target)).value)">
-            <option value="">Todas las sucursales</option>
-            @for (sucursal of sucursales; track sucursal.id) {
-              <option [value]="sucursal.id">{{ sucursal.nombre }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Sala</th><th>Sucursal</th><th>Tipo</th><th>Capacidad</th><th>Estado</th><th></th></tr>
-            </thead>
-            <tbody>
-              @for (sala of paginatedItems; track sala.id) {
-                <tr>
-                  <td>{{ sala.nombre }}</td>
-                  <td>{{ sucursalNombre(sala.idSucursal) }}</td>
-                  <td><span class="tag">{{ sala.tipo }}</span></td>
-                  <td>{{ sala.capacidadTotal }}</td>
-                  <td><span class="status ok">{{ sala.estado }}</span></td>
-                  <td><button type="button" class="ghost" (click)="edit(sala)">Editar</button></td>
-                </tr>
-              } @empty {
-                <tr><td colspan="6" class="muted">Sin salas registradas.</td></tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        @if (totalPages > 1) {
-          <div class="pagination">
-            <button type="button" class="ghost" [disabled]="currentPage === 1" (click)="prevPage()">Anterior</button>
-            <span class="muted">Pagina {{ currentPage }} de {{ totalPages }}</span>
-            <button type="button" class="ghost" [disabled]="currentPage === totalPages" (click)="nextPage()">Siguiente</button>
-          </div>
-        }
-      </section>
+      <app-salas-table
+        [items]="paginatedItems"
+        [sucursales]="sucursales"
+        [filterSucursal]="filterSucursal"
+        [currentPage]="currentPage"
+        [totalPages]="totalPages"
+        (filterChange)="filter($event)"
+        (edit)="edit($event)"
+        (prevPage)="prevPage()"
+        (nextPage)="nextPage()"
+      />
     </div>
 
-    @if (showModal) {
-      <div class="modal-overlay" (click)="closeModal()">
-        <div class="modal" role="dialog" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h2>{{ editingId ? 'Editar sala' : 'Crear sala' }}</h2>
-            <button type="button" class="ghost" (click)="closeModal()">Cerrar</button>
-          </div>
-          <form [formGroup]="form" class="grid three" (ngSubmit)="save()">
-            <input formControlName="nombre" placeholder="Nombre" />
-            <select formControlName="idSucursal">
-              <option value="">Sucursal</option>
-              @for (sucursal of sucursales; track sucursal.id) {
-                <option [value]="sucursal.id">{{ sucursal.nombre }}</option>
-              }
-            </select>
-            <select formControlName="tipo">
-              @for (tipo of tipos; track tipo) {
-                <option [value]="tipo">{{ tipo }}</option>
-              }
-            </select>
-            <input formControlName="capacidadTotal" type="number" min="0" placeholder="Capacidad" />
-            <select formControlName="estado">
-              @for (estado of estados; track estado) {
-                <option [value]="estado">{{ estado }}</option>
-              }
-            </select>
-            <div class="actions">
-              <button type="submit" [disabled]="form.invalid || saving">Guardar</button>
-              <button type="button" class="ghost" (click)="closeModal()">Cancelar</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    }
+    <app-salas-modal
+      [visible]="showModal"
+      [sala]="editingSala"
+      [sucursales]="sucursales"
+      [saving]="saving"
+      (closed)="closeModal()"
+      (saved)="save($event)"
+    />
   `
 })
 export class SalasComponent implements OnInit {
-  private readonly fb = inject(FormBuilder);
   private readonly cinema = inject(CinemaCoreService);
   readonly pageSize = 10;
-  readonly tipos = TIPOS_SALA;
-  readonly estados = ESTADOS_SALA;
   sucursales: Sucursal[] = [];
   salas: Sala[] = [];
   filterSucursal = '';
   currentPage = 1;
-  editingId: string | null = null;
+  editingSala: Sala | null = null;
   showModal = false;
   saving = false;
   error = '';
-
-  readonly form = this.fb.nonNullable.group({
-    nombre: ['', Validators.required],
-    tipo: ['FORMATO_2D' as TipoSala, Validators.required],
-    capacidadTotal: [0, [Validators.required, Validators.min(0)]],
-    estado: ['DISPONIBLE' as EstadoSala, Validators.required],
-    idSucursal: ['', Validators.required]
-  });
 
   get totalPages(): number {
     return Math.max(1, Math.ceil(this.salas.length / this.pageSize));
@@ -175,51 +107,30 @@ export class SalasComponent implements OnInit {
     }
   }
 
-  sucursalNombre(idSucursal: string): string {
-    return this.sucursales.find((item) => item.id === idSucursal)?.nombre ?? idSucursal;
-  }
-
   openCreate(): void {
-    this.resetForm();
+    this.editingSala = null;
     this.showModal = true;
   }
 
   closeModal(): void {
     this.showModal = false;
-    this.resetForm();
+    this.editingSala = null;
   }
 
   edit(sala: Sala): void {
-    this.editingId = sala.id;
-    this.form.setValue({
-      nombre: sala.nombre,
-      tipo: sala.tipo,
-      capacidadTotal: sala.capacidadTotal,
-      estado: sala.estado,
-      idSucursal: sala.idSucursal
-    });
+    this.editingSala = sala;
     this.showModal = true;
   }
 
-  resetForm(): void {
-    this.editingId = null;
-    this.form.reset({
-      nombre: '',
-      tipo: 'FORMATO_2D',
-      capacidadTotal: 0,
-      estado: 'DISPONIBLE',
-      idSucursal: ''
-    });
-  }
-
-  save(): void {
-    if (this.form.invalid) {
-      return;
-    }
+  save(payload: { formValue: SalaFormValue; editingId: string | null }): void {
     this.saving = true;
     this.error = '';
-    const input = this.editingId ? { id: this.editingId, ...this.form.getRawValue() } : this.form.getRawValue();
-    const request = this.editingId ? this.cinema.actualizarSala(input) : this.cinema.crearSala(input);
+    const input: Record<string, unknown> = payload.editingId
+      ? { id: payload.editingId, ...payload.formValue }
+      : { ...payload.formValue };
+    const request = payload.editingId
+      ? this.cinema.actualizarSala(input)
+      : this.cinema.crearSala(input);
     request.subscribe({
       next: () => {
         this.saving = false;
