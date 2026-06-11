@@ -1,9 +1,32 @@
 import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { GraphqlService } from '../graphql/graphql.service';
-import { Pelicula, Promocion, Sala, Sucursal } from '../models/cinema.models';
+import {
+  Funcion,
+  Pelicula,
+  ProgramacionDetalle,
+  Promocion,
+  ResumenButacasSala,
+  Sala,
+  Sucursal
+} from '../models/cinema.models';
 
 type Input = Record<string, unknown>;
+
+const FUNCION_FIELDS = `
+  id fechaHoraIni fechaHoraFin precioBase precioVip precioPreferente
+  idioma estado butacasDisponibles idSala idCartelera idPelicula
+`;
+
+const PROGRAMACION_DETALLE_FIELDS = `
+  funcion { ${FUNCION_FIELDS} }
+  pelicula { id titulo duracionMinutos estado clasificacion generos director }
+  sala { id nombre tipo capacidadTotal estado idSucursal }
+  sucursal { id nombre ciudad direccion }
+  cartelera { id fecha hora titulo estado salaNombre precio tienePromo }
+  promociones { id descuentoPromocional precioPromocional activo idFuncion idPromocion }
+  resumenButacas { idSala total disponibles reservadas ocupadas bloqueadas mantenimiento }
+`;
 
 @Injectable({ providedIn: 'root' })
 export class CinemaCoreService {
@@ -41,6 +64,14 @@ export class CinemaCoreService {
     `).pipe(map((data) => data.salas));
   }
 
+  getSalasDisponibles(): Observable<Sala[]> {
+    return this.graphql.request<{ salasDisponibles: Sala[] }>(`
+      query SalasDisponibles {
+        salasDisponibles { id nombre tipo capacidadTotal estado idSucursal }
+      }
+    `).pipe(map((data) => data.salasDisponibles));
+  }
+
   getSalasPorSucursal(idSucursal: string): Observable<Sala[]> {
     return this.graphql.request<{ salasPorSucursal: Sala[] }>(`
       query SalasPorSucursal($idSucursal: ID!) {
@@ -73,6 +104,14 @@ export class CinemaCoreService {
     `).pipe(map((data) => data.peliculas));
   }
 
+  getPeliculasProgramables(): Observable<Pelicula[]> {
+    return this.graphql.request<{ peliculasProgramables: Pelicula[] }>(`
+      query PeliculasProgramables {
+        peliculasProgramables { id titulo duracionMinutos estado clasificacion generos director }
+      }
+    `).pipe(map((data) => data.peliculasProgramables));
+  }
+
   crearPelicula(input: Input): Observable<Pelicula> {
     return this.graphql.request<{ crearPelicula: Pelicula }>(`
       mutation CrearPelicula($input: CrearPeliculaInput!) {
@@ -93,6 +132,50 @@ export class CinemaCoreService {
     return this.graphql.request<{ eliminarPelicula: boolean }>(`
       mutation EliminarPelicula($id: ID!) { eliminarPelicula(id: $id) }
     `, { id }).pipe(map((data) => data.eliminarPelicula));
+  }
+
+  sembrarPeliculasPrueba(cantidad: number): Observable<number> {
+    return this.graphql.request<{ sembrarPeliculasPrueba: number }>(`
+      mutation SembrarPeliculas($cantidad: Int!) { sembrarPeliculasPrueba(cantidad: $cantidad) }
+    `, { cantidad }).pipe(map((data) => data.sembrarPeliculasPrueba));
+  }
+
+  getFunciones(): Observable<Funcion[]> {
+    return this.graphql.request<{ funciones: Funcion[] }>(`
+      query Funciones { funciones { ${FUNCION_FIELDS} } }
+    `).pipe(map((data) => data.funciones));
+  }
+
+  getProgramacionDetalle(idFuncion: string): Observable<ProgramacionDetalle> {
+    return this.graphql.request<{ programacionDetalle: ProgramacionDetalle }>(`
+      query ProgramacionDetalle($idFuncion: ID!) {
+        programacionDetalle(idFuncion: $idFuncion) { ${PROGRAMACION_DETALLE_FIELDS} }
+      }
+    `, { idFuncion }).pipe(map((data) => data.programacionDetalle));
+  }
+
+  crearFuncion(input: Input): Observable<Funcion> {
+    return this.graphql.request<{ crearFuncion: Funcion }>(`
+      mutation CrearFuncion($input: CrearFuncionInput!) {
+        crearFuncion(input: $input) { ${FUNCION_FIELDS} }
+      }
+    `, { input }).pipe(map((data) => data.crearFuncion));
+  }
+
+  sembrarFuncionesPrueba(cantidad: number): Observable<number> {
+    return this.graphql.request<{ sembrarFuncionesPrueba: number }>(`
+      mutation SembrarFunciones($cantidad: Int!) { sembrarFuncionesPrueba(cantidad: $cantidad) }
+    `, { cantidad }).pipe(map((data) => data.sembrarFuncionesPrueba));
+  }
+
+  getResumenButacasPorSala(idSala: string): Observable<ResumenButacasSala> {
+    return this.graphql.request<{ resumenButacasPorSala: ResumenButacasSala }>(`
+      query ResumenButacas($idSala: ID!) {
+        resumenButacasPorSala(idSala: $idSala) {
+          idSala total disponibles reservadas ocupadas bloqueadas mantenimiento
+        }
+      }
+    `, { idSala }).pipe(map((data) => data.resumenButacasPorSala));
   }
 
   getPromociones(): Observable<Promocion[]> {

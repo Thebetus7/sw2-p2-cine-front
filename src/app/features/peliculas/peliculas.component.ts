@@ -11,6 +11,22 @@ import { PeliculasTableComponent } from './peliculas-table.component';
   selector: 'app-peliculas',
   standalone: true,
   imports: [CommonModule, PeliculasTableComponent, PeliculasModalComponent],
+  styles: [`
+    .header-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .progress-bar {
+      margin-top: 0.75rem;
+      height: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      background: #6366f1;
+      transition: width 0.2s ease;
+    }
+  `],
   template: `
     <div class="page">
       <header class="page-header">
@@ -18,11 +34,22 @@ import { PeliculasTableComponent } from './peliculas-table.component';
           <h1>Peliculas</h1>
           <p>Catalogo de peliculas disponible para cartelera y funciones.</p>
         </div>
-        <button type="button" class="ghost" (click)="openCreate()">Nueva pelicula</button>
+        <div class="header-actions">
+          <button type="button" class="ghost" (click)="openCreate()">Nueva pelicula</button>
+          <button type="button" class="ghost" (click)="seedPeliculas()" [disabled]="seeding">
+            {{ seeding ? 'Generando...' : 'Generar 400 peliculas de prueba' }}
+          </button>
+        </div>
       </header>
 
       @if (error) {
         <div class="alert">{{ error }}</div>
+      }
+      @if (success) {
+        <div class="alert" style="border-color:#22c55e">{{ success }}</div>
+      }
+      @if (seeding) {
+        <div class="progress-bar"><span [style.width.%]="seedProgress"></span></div>
       }
 
       <app-peliculas-table
@@ -54,7 +81,10 @@ export class PeliculasComponent implements OnInit {
   editingPelicula: Pelicula | null = null;
   showModal = false;
   saving = false;
+  seeding = false;
+  seedProgress = 0;
   error = '';
+  success = '';
 
   get totalPages(): number {
     return Math.max(1, Math.ceil(this.peliculas.length / this.pageSize));
@@ -161,6 +191,29 @@ export class PeliculasComponent implements OnInit {
     this.cinema.eliminarPelicula(pelicula.id).subscribe({
       next: () => this.load(),
       error: (error: Error) => this.error = error.message
+    });
+  }
+
+  seedPeliculas(): void {
+    if (!confirm('Generar 400 peliculas de prueba? Puedes repetir esta accion cuando quieras.')) {
+      return;
+    }
+    this.seeding = true;
+    this.seedProgress = 30;
+    this.error = '';
+    this.success = '';
+    this.cinema.sembrarPeliculasPrueba(400).subscribe({
+      next: (cantidad) => {
+        this.seedProgress = 100;
+        this.seeding = false;
+        this.success = `Se generaron ${cantidad} peliculas de prueba.`;
+        this.load();
+      },
+      error: (error: Error) => {
+        this.error = error.message;
+        this.seeding = false;
+        this.seedProgress = 0;
+      }
     });
   }
 }
